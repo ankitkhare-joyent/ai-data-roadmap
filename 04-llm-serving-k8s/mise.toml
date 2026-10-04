@@ -1,0 +1,27 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+PYTHONPATH = "src"
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.size]
+description = "GPU memory, KV cache and cost math for a few common models"
+run = "uv run python -m serving_lab.sizing"
+
+[tasks.up]
+description = "Three GPU-free vLLM simulators + the routing gateway (check `docker ps` first)"
+run = "docker compose up -d --build --wait"
+
+[tasks.bench]
+description = "Same agentic workload through round-robin, least-loaded and prefix-aware routing"
+run = "docker compose run --rm bench"
+
+[tasks.down]
+run = "docker compose down"

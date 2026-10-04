@@ -1,0 +1,43 @@
+# The same model as a KServe LLMInferenceService (KServe 0.21, llm-d under the hood). KServe creates the
+# vLLM pods, the InferencePool, the endpoint picker and the HTTPRoute from this one object.
+# Adapted from KServe's docs/samples/llmisvc.
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: qwen3-32b
+  namespace: llm
+spec:
+  model:
+    uri: hf://Qwen/Qwen3-32B-FP8
+    name: Qwen/Qwen3-32B-FP8
+  replicas: 2
+  router:
+    scheduler:
+      config:
+        inline:
+          apiVersion: llm-d.ai/v1alpha1
+          kind: EndpointPickerConfig
+          plugins:
+            - type: single-profile-handler
+            - type: prefix-cache-scorer
+            - type: kv-cache-utilization-scorer
+            - type: queue-scorer
+            - type: max-score-picker
+          schedulingProfiles:
+            - name: default
+              plugins:
+                - { pluginRef: prefix-cache-scorer, weight: 3 }
+                - { pluginRef: kv-cache-utilization-scorer, weight: 2 }
+                - { pluginRef: queue-scorer, weight: 2 }
+                - { pluginRef: max-score-picker }
+    route: {}
+    gateway: {}
+  template:
+    containers:
+      - name: main
+        env:
+          - name: VLLM_ADDITIONAL_ARGS
+            value: "--max-model-len 32768 --kv-cache-dtype fp8 --enable-prefix-caching"
+        resources:
+          requests: { cpu: "8", memory: 64Gi, nvidia.com/gpu: "1" }
+          limits: { memory: 96Gi, nvidia.com/gpu: "1" }

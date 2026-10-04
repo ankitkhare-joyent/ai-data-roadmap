@@ -1,0 +1,74 @@
+# Plain vLLM on EKS: the building block under KServe, llm-d and Ray Serve LLM. Read this one first.
+# Qwen3-32B in FP8 on one H100: ~31 GiB of weights leaves ~40 GiB of KV cache (see `mise run size`).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-32b
+  namespace: llm
+  labels: { app: qwen3-32b }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: qwen3-32b }
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }   # GPUs are scarce: surge one, never drop capacity
+  template:
+    metadata:
+      labels: { app: qwen3-32b }                         # the InferencePool selects on this
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      serviceAccountName: qwen3-32b                      # EKS Pod Identity: read-only access to the model bucket
+      nodeSelector:
+        karpenter.k8s.aws/instance-family: p5            # H100 nodes from a dedicated Karpenter NodePool
+      tolerations:
+        - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+      terminationGracePeriodSeconds: 120                 # let in-flight streams finish on scale-down
+      containers:
+        - name: vllm
+          image: docker.io/vllm/vllm-openai:v0.30.0
+          args:
+            # Stream weights straight from S3 into GPU memory: no PVC, no init-container copy, faster cold start.
+            - --model=s3://acme-models/qwen/Qwen3-32B-FP8
+            - --load-format=runai_streamer
+            - --served-model-name=qwen3-32b
+            - --max-model-len=32768
+            - --gpu-memory-utilization=0.92
+            - --kv-cache-dtype=fp8                       # halves KV memory: about twice the concurrency
+            - --enable-prefix-caching                    # reuse KV for shared prompt prefixes
+            - --max-num-seqs=128
+            # Request logging is off by default (--enable-log-requests turns it on): prompts are customer data.
+          env:
+            - { name: AWS_REGION, value: us-east-1 }
+          ports:
+            - { name: http, containerPort: 8000 }
+          resources:
+            requests: { cpu: "8", memory: 64Gi, nvidia.com/gpu: "1" }
+            limits: { memory: 96Gi, nvidia.com/gpu: "1" }
+          startupProbe:                                  # model load takes minutes; don't let liveness kill it
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 90
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+            failureThreshold: 4
+          volumeMounts:
+            - { name: shm, mountPath: /dev/shm }         # NCCL and tensor parallelism need a large /dev/shm
+      volumes:
+        - name: shm
+          emptyDir: { medium: Memory, sizeLimit: 16Gi }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: qwen3-32b
+  namespace: llm
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: qwen3-32b }

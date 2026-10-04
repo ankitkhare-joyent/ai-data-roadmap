@@ -1,0 +1,53 @@
+# Lesson 4 local lab: three GPU-free vLLM simulators behind an inference-aware router.
+#
+#   bench ──> router (round_robin | least_loaded | prefix_aware) ──> sim-1, sim-2, sim-3
+#
+# The simulators (llm-d-inference-sim) speak vLLM's OpenAI API, publish vLLM's Prometheus metrics, keep a
+# simulated prefix (KV) cache, and charge prefill time only for uncached prompt tokens. The latency numbers
+# below roughly model an 8B model on one mid-range GPU, slowed down so cache effects are easy to see.
+# No secrets in this lesson: the model servers are internal and the router holds no credentials.
+#
+# Ports (127.0.0.1 only): 49480 router
+name: llm-serving
+
+x-sim: &sim
+  image: ghcr.io/llm-d/llm-d-inference-sim:v0.11.4
+  command:
+    - --model=acme/fleet-8b              # a made-up name: the simulator uses a fast built-in tokeniser
+    - --port=8000
+    - --max-num-seqs=8                   # batch slots per replica; more requests queue
+    - --latency-calculator=per-token
+    - --prefill-overhead=20ms
+    - --prefill-time-per-token=200us     # exaggerated so a cache hit on a 1.5k-token prompt is obvious
+    - --inter-token-latency=15ms
+    - --inter-token-latency-std-dev=2ms
+    - --time-factor-under-load=1.5       # full batches decode slower, as on a real GPU
+    - --enable-kvcache
+    - --kv-cache-size=1024               # blocks; a few tenants' prompts fit, all of them don't
+    - --block-size=16
+  mem_limit: 128m
+
+services:
+  sim-1: *sim
+  sim-2: *sim
+  sim-3: *sim
+
+  router:
+    build: .
+    image: llm-serving/lab:dev
+    command: ["python", "-m", "serving_lab.router"]
+    environment:
+      BACKENDS: http://sim-1:8000,http://sim-2:8000,http://sim-3:8000
+      SPILL_SLACK: "3"
+    ports: ["127.0.0.1:49480:8080"]
+    depends_on: [sim-1, sim-2, sim-3]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 3s
+    mem_limit: 256m
+
+  bench:
+    image: llm-serving/lab:dev
+    command: ["python", "-m", "serving_lab.compare", "--url", "http://router:8080"]
+    depends_on: { router: { condition: service_healthy } }
+    profiles: [tools]

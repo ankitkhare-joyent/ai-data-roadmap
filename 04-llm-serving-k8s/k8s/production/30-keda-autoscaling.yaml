@@ -1,0 +1,27 @@
+# Scale on what saturates an LLM server: requests waiting for a batch slot. CPU is meaningless here
+# and GPU utilisation is near 100% whenever there is any load at all.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: qwen3-32b
+  namespace: llm
+spec:
+  scaleTargetRef:
+    name: qwen3-32b
+  minReplicaCount: 1                  # 0 is possible, but a cold start of a 32B model is minutes
+  maxReplicaCount: 8
+  pollingInterval: 15
+  cooldownPeriod: 600                 # GPUs are slow to come back: scale down reluctantly
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 600
+          policies: [{ type: Pods, value: 1, periodSeconds: 300 }]
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-operated.monitoring:9090
+        # Average queue per replica; scale out when more than 4 requests wait for a slot.
+        query: sum(vllm:num_requests_waiting{model_name="qwen3-32b"})
+        threshold: "4"

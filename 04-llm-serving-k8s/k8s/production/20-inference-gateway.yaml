@@ -1,0 +1,47 @@
+# Gateway API Inference Extension (InferencePool is GA, inference.networking.k8s.io/v1).
+# The Gateway asks an endpoint picker (EPP) which pod should take each request, based on prefix-cache
+# hits, queue depth and KV-cache use, instead of round-robin. Supported gateways include kgateway,
+# Istio, Envoy AI Gateway and GKE's gateway; the EPP itself is deployed with the llm-d router chart
+# (oci://ghcr.io/llm-d/charts/llm-d-router-gateway), which is what serving_lab/router.py imitates.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: inference-gateway
+  namespace: llm
+spec:
+  gatewayClassName: kgateway          # or istio, envoy-ai-gateway, gke-l7-rilb ...
+  listeners:
+    - { name: http, protocol: HTTP, port: 80 }
+---
+apiVersion: inference.networking.k8s.io/v1
+kind: InferencePool
+metadata:
+  name: qwen3-32b
+  namespace: llm
+spec:
+  selector:
+    matchLabels: { app: qwen3-32b }
+  targetPorts:
+    - number: 8000
+  endpointPickerRef:
+    name: qwen3-32b-epp
+    port: { number: 9002 }
+    failureMode: FailOpen             # if the picker is down, fall back to the gateway's own balancing
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: qwen3-32b
+  namespace: llm
+spec:
+  parentRefs:
+    - name: inference-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /v1 }
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: qwen3-32b
+      timeouts:
+        request: 600s                 # long generations and agent turns; the default would cut streams

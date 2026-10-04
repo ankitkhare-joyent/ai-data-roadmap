@@ -1,0 +1,62 @@
+# The same model on Ray Serve LLM via KubeRay 1.7 (you already run KubeRay). Ray Serve wraps vLLM and adds
+# Ray-native autoscaling on ongoing requests, multi-model apps, and an easy path to batch inference with
+# Ray Data on the same cluster (lesson 5). Adapted from KubeRay's ray-service.llm-serve.yaml sample.
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: qwen3-32b
+  namespace: llm
+spec:
+  serveConfigV2: |
+    applications:
+    - name: llms
+      import_path: ray.serve.llm:build_openai_app
+      route_prefix: "/"
+      args:
+        llm_configs:
+        - model_loading_config:
+            model_id: qwen3-32b
+            model_source: Qwen/Qwen3-32B-FP8
+          engine_kwargs:
+            max_model_len: 32768
+            gpu_memory_utilization: 0.92
+            kv_cache_dtype: fp8
+            enable_prefix_caching: true
+          deployment_config:
+            autoscaling_config:
+              min_replicas: 1
+              max_replicas: 8
+              target_ongoing_requests: 48
+            max_ongoing_requests: 128
+  rayClusterConfig:
+    rayVersion: "2.59.0"
+    headGroupSpec:
+      rayStartParams: { num-cpus: "0", num-gpus: "0" }   # keep work off the head node
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: rayproject/ray-llm:2.59.0-py312-cu130
+              ports:
+                - { containerPort: 8000, name: serve }
+                - { containerPort: 8265, name: dashboard }
+                - { containerPort: 6379, name: gcs }
+              resources:
+                requests: { cpu: "2", memory: 8Gi }
+                limits: { memory: 8Gi }
+    workerGroupSpecs:
+      - groupName: h100
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 8
+        rayStartParams: { num-gpus: "1" }
+        template:
+          spec:
+            nodeSelector: { karpenter.k8s.aws/instance-family: p5 }
+            tolerations: [{ key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }]
+            containers:
+              - name: ray-worker
+                image: rayproject/ray-llm:2.59.0-py312-cu130
+                resources:
+                  requests: { cpu: "8", memory: 64Gi, nvidia.com/gpu: "1" }
+                  limits: { memory: 96Gi, nvidia.com/gpu: "1" }
