@@ -1,0 +1,66 @@
+# Lesson 3: an MCP server that only accepts short-lived, audience-bound JWTs issued by OpenBao.
+#
+#   agent ──AppRole──> OpenBao ──JWT (aud=mcp, scope, 5m)──> agent ──Bearer──> fleet-ops MCP
+#                         └──────────── JWKS (public keys) ─────────────────────────┘
+#
+# Ports (127.0.0.1 only): 49300 OpenBao UI   49301 MCP server
+name: agent-security
+
+services:
+  openbao:
+    image: quay.io/openbao/openbao:2.7.1
+    user: "0:0"   # prepares the seal volume as root; docker-entrypoint.sh then drops to the openbao user
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mkdir -p /openbao/seal
+        [ -s /openbao/seal/unseal.key ] || head -c 32 /dev/urandom > /openbao/seal/unseal.key
+        chown -R openbao:openbao /openbao/seal /openbao/file && chmod 400 /openbao/seal/unseal.key
+        exec docker-entrypoint.sh bao server -config=/openbao/config/config.hcl
+    cap_add: [IPC_LOCK]
+    ports: ["127.0.0.1:49300:8200"]
+    volumes: [./openbao/config.hcl:/openbao/config/config.hcl:ro, bao-data:/openbao/file, bao-seal:/openbao/seal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null 'http://127.0.0.1:8200/v1/sys/health?uninitcode=200&sealedcode=200' || exit 1"]
+      interval: 3s
+      retries: 30
+    mem_limit: 256m
+
+  bao-bootstrap:
+    image: python:3.13-slim
+    command: ["python", "/scripts/bao_bootstrap.py"]
+    environment: { BAO_ADDR: "http://openbao:8200", MCP_RESOURCE: "http://mcp:8300/mcp" }
+    volumes:
+      - ./scripts/bao_bootstrap.py:/scripts/bao_bootstrap.py:ro
+      - ./openbao/policies:/policies:ro
+      - bao-init:/bootstrap/init
+      - bao-approle:/bootstrap/approle
+    depends_on: { openbao: { condition: service_healthy } }
+    profiles: [setup]
+
+  mcp:
+    build: .
+    image: agent-security/app:dev
+    command: ["python", "-m", "secure_agent.mcp_server"]
+    environment:
+      MCP_ISSUER: http://openbao:8200/v1/identity/oidc
+      MCP_RESOURCE: http://mcp:8300/mcp
+      MCP_JWKS_URL: http://openbao:8200/v1/identity/oidc/.well-known/keys
+    ports: ["127.0.0.1:49301:8300"]
+    depends_on: { openbao: { condition: service_healthy } }
+    mem_limit: 256m
+
+  demo:
+    image: agent-security/app:dev
+    command: ["python", "-m", "secure_agent.demo"]
+    environment: { BAO_ADDR: "http://openbao:8200", MCP_URL: "http://mcp:8300/mcp" }
+    volumes: [bao-approle:/bootstrap/approle:ro]
+    depends_on: [mcp]
+    profiles: [tools]
+
+volumes:
+  bao-data: {}
+  bao-seal: {}
+  bao-init: {}
+  bao-approle: {}

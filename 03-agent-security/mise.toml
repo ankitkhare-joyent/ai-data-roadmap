@@ -1,0 +1,32 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+_.file = ".env"
+PYTHONPATH = "src:."
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.redteam]
+description = "Attack success rate with the security layer off and on (no Docker, no API key)"
+run = "uv run python -m secure_agent.redteam"
+
+[tasks.up]
+description = "OpenBao (identity tokens) + the authenticated MCP server (check `docker ps` first)"
+run = """
+docker compose up -d --wait openbao
+docker compose run --rm bao-bootstrap
+docker compose up -d --wait mcp
+"""
+
+[tasks.demo]
+description = "Mint OpenBao JWTs and call the MCP server with the right, wrong and missing scopes"
+run = "docker compose run --rm demo"
+
+[tasks.down]
+run = "docker compose down"
