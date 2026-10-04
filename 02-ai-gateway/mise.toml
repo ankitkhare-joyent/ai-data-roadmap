@@ -1,0 +1,20 @@
+[env]
+_.file = ".env"          # git-ignored; optional ANTHROPIC_API_KEY (and ANTHROPIC_API_BASE=https://api.anthropic.com)
+
+[tasks.up]
+description = "Start the gateway stack (check `docker ps` first: Docker is shared)"
+run = """
+docker compose up -d --wait openbao postgres redis fake-llm
+docker compose run --rm bao-bootstrap
+docker compose up -d --wait litellm
+"""
+
+[tasks.demo]
+description = "Teams, keys, allow-lists, fallback, rate limits, budgets, cache, spend"
+run = "docker compose run --rm --build demo"
+
+[tasks.down]
+run = "docker compose down"
+
+[tasks.nuke]
+run = "docker compose down -v"

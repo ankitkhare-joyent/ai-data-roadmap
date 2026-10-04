@@ -1,0 +1,116 @@
+# Lesson 2: an AI gateway (LiteLLM) in front of every model call.
+#
+#   apps ──virtual key──> litellm ──provider key (from OpenBao)──> Anthropic, or the fake provider
+#                           │  └── Redis: rate limits, cooldowns, response cache
+#                           └───── Postgres: teams, keys, budgets, spend logs (password owned by OpenBao)
+#
+# Ports (127.0.0.1 only): 49400 gateway   49401 OpenBao UI
+name: ai-gateway
+
+services:
+  openbao:
+    image: quay.io/openbao/openbao:2.7.1
+    user: "0:0"   # prepares the seal volume as root; docker-entrypoint.sh then drops to the openbao user
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mkdir -p /openbao/seal
+        [ -s /openbao/seal/unseal.key ] || head -c 32 /dev/urandom > /openbao/seal/unseal.key
+        chown -R openbao:openbao /openbao/seal /openbao/file && chmod 400 /openbao/seal/unseal.key
+        exec docker-entrypoint.sh bao server -config=/openbao/config/config.hcl
+    cap_add: [IPC_LOCK]
+    ports: ["127.0.0.1:49401:8200"]
+    volumes: [./openbao/config.hcl:/openbao/config/config.hcl:ro, bao-data:/openbao/file, bao-seal:/openbao/seal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null 'http://127.0.0.1:8200/v1/sys/health?uninitcode=200&sealedcode=200' || exit 1"]
+      interval: 3s
+      retries: 30
+    mem_limit: 256m
+
+  postgres:
+    image: postgres:18.0-trixie
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_PASSWORD: pg-bootstrap-only      # LOCAL: OpenBao rotates it on first bootstrap
+    volumes: [pg-data:/var/lib/postgresql, ./sql:/docker-entrypoint-initdb.d:ro]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "litellm"]
+      interval: 3s
+      retries: 30
+    mem_limit: 512m
+
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb",
+              "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+    mem_limit: 192m
+
+  fake-llm:
+    build: ./fake_llm
+    environment: { FAIL_RATE: "${FAKE_FAIL_RATE:-0.5}" }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 3s
+    mem_limit: 128m
+
+  bao-bootstrap:
+    image: python:3.13-slim
+    command: ["python", "/scripts/bao_bootstrap.py"]
+    environment:
+      BAO_ADDR: http://openbao:8200
+      PG_BOOTSTRAP_PASSWORD: pg-bootstrap-only
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./scripts/bao_bootstrap.py:/scripts/bao_bootstrap.py:ro
+      - ./openbao/policies:/policies:ro
+      - bao-init:/bootstrap/init
+      - bao-approle:/bootstrap/approle
+      - gw-admin:/bootstrap/admin
+    depends_on:
+      openbao: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    profiles: [setup]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.104.0
+    entrypoint: ["python", "/app/entrypoint.py"]
+    environment:
+      BAO_ADDR: http://openbao:8200
+      BAO_APPROLE_DIR: /bootstrap/approle/litellm
+      ANTHROPIC_API_BASE: ${ANTHROPIC_API_BASE:-http://fake-llm:8080}
+      REDIS_HOST: redis
+      LITELLM_LOG: WARNING
+      STORE_MODEL_IN_DB: "False"
+    volumes:
+      - ./gateway/config.yaml:/app/config.yaml:ro
+      - ./gateway/entrypoint.py:/app/entrypoint.py:ro
+      - bao-approle:/bootstrap/approle:ro
+    ports: ["127.0.0.1:49400:4000"]
+    depends_on:
+      openbao: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      fake-llm: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')"]
+      interval: 5s
+      retries: 60
+    mem_limit: 1536m
+
+  demo:
+    build: ./demo
+    environment: { GATEWAY_URL: "http://litellm:4000", FAKE_URL: "http://fake-llm:8080" }
+    volumes: [gw-admin:/bootstrap/admin:ro]
+    profiles: [tools]
+
+volumes:
+  bao-data: {}
+  bao-seal: {}
+  bao-init: {}
+  bao-approle: {}
+  gw-admin: {}
+  pg-data: {}
