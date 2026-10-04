@@ -1,0 +1,28 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+_.file = ".env"          # git-ignored; only ANTHROPIC_API_KEY, copied into OpenBao by bao-bootstrap
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+description = "Workflow tests on Temporal's time-skipping test server (no Docker needed)"
+run = "uv run pytest -q"
+
+[tasks.up]
+description = "Start OpenBao + Temporal + worker (check `docker ps` first: Docker is shared)"
+run = "docker compose up -d --build --wait openbao temporal && docker compose run --rm bao-bootstrap && docker compose up -d --wait worker"
+
+[tasks.demo]
+description = "Run the crash-and-approve walkthrough"
+run = "scripts/demo.sh"
+
+[tasks.down]
+run = "docker compose down"
+
+[tasks.nuke]
+description = "Stop and delete all data, including OpenBao and Temporal history"
+run = "docker compose down -v"
