@@ -1,0 +1,31 @@
+# secrets and local config: never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.crt
+init.json
+unseal*.json
+**/approle/
+*.token
+mise.local.toml
+# OpenBao / Terraform / OpenTofu state
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+openbao-data/
+# Python / tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# models and data downloads
+models/
+*.gguf
+*.safetensors
+.DS_Store
