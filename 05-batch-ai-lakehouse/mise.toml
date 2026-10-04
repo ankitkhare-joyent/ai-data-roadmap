@@ -1,0 +1,21 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+_.file = ".env"            # optional ANTHROPIC_API_KEY for --llm claude-batch / claude-online
+PYTHONPATH = "src"
+LAKEHOUSE_DIR = "{{config_root}}/.lakehouse"   # git-ignored local warehouse
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.demo]
+description = "Seed tickets, enrich incrementally, add new tickets, enrich again, evaluate, embed, search (offline)"
+run = "uv run python -m lakehouse_ai.demo"
+
+[tasks.clean]
+run = "rm -rf .lakehouse"

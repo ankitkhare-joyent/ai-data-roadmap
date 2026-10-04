@@ -29,3 +29,6 @@ models/
 *.gguf
 *.safetensors
 .DS_Store
+
+# lesson 5 local warehouse
+.lakehouse/
