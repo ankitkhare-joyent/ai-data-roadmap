@@ -1,0 +1,3 @@
+[2026-10-03, 02:00:00 UTC] {sensors.py:102} INFO - Poking for glue.ec2.instances partition snapshot_date=2026-10-03
+[2026-10-03, 05:00:00 UTC] {sensors.py:102} INFO - Poking for glue.ec2.instances partition snapshot_date=2026-10-03
+[2026-10-03, 08:00:00 UTC] {taskinstance.py:2905} ERROR - AirflowSensorTimeout: Sensor wait_for_ec2_instances timed out after 21600s

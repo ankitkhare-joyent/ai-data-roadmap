@@ -1,0 +1,6 @@
+[2026-10-03, 02:31:04 UTC] {emr_containers.py:142} INFO - Job run 00000003abc started on virtual cluster prod-spark
+[2026-10-03, 02:44:19 UTC] {emr_containers.py:180} INFO - driver: Stage 4 (repartition at flatten.py:88) 1937/2000 tasks
+[2026-10-03, 02:51:47 UTC] {emr_containers.py:180} INFO - driver: WARN TaskSetManager: Lost task 1412.0 in stage 4.0 (TID 9921): ExecutorLostFailure (executor 7 exited caused by one of the running tasks) Reason: Container killed: OOMKilled. Container memory limit 4.5 GiB
+[2026-10-03, 02:51:47 UTC] {emr_containers.py:180} INFO - driver: WARN TaskSetManager: task 1412 input size 2.8 GiB, median task input 41 MiB (skew)
+[2026-10-03, 02:55:02 UTC] {emr_containers.py:180} ERROR - driver: Job aborted due to stage failure: Task 1412 in stage 4.0 failed 4 times
+[2026-10-03, 02:55:03 UTC] {taskinstance.py:2905} ERROR - Task failed with exception: EmrContainerOperator job run FAILED

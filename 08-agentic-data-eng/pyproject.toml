@@ -1,0 +1,19 @@
+[project]
+name = "agentic-data-eng"
+version = "0.1.0"
+description = "Lesson 8: an agent that triages failed data pipelines using OpenLineage and data contracts, and proposes fixes as reviewed patches"
+requires-python = ">=3.13,<3.14"
+dependencies = ["anthropic>=1.11,<2", "pyyaml>=6"]
+
+[dependency-groups]
+dev = ["pytest>=9.1", "ruff>=0.14"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

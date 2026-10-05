@@ -1,0 +1,21 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+_.file = ".env"            # optional ANTHROPIC_API_KEY for `mise run triage-claude`
+PYTHONPATH = "src"
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.triage]
+description = "Triage the four failed runs: classify, blast radius, contract check, proposed action (offline)"
+run = "uv run python -m data_agent.triage"
+
+[tasks.triage-claude]
+description = "Same, with Claude driving the investigation through the tools"
+run = "uv run python -m data_agent.triage --claude"

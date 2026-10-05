@@ -1,0 +1,4 @@
+[2026-10-03, 03:49:58 UTC] {emr_containers.py:180} INFO - driver: Reading glue.ec2.instances
+[2026-10-03, 03:50:12 UTC] {emr_containers.py:180} ERROR - driver: py4j.protocol.Py4JJavaError: An error occurred while calling o112.saveAsTable.
+: software.amazon.awssdk.services.glue.model.AccessDeniedException: User: arn:aws:sts::392910111111:assumed-role/ml-feature-job/emr is not authorized to perform: glue:GetTable on resource: arn:aws:glue:eu-west-1:392910111111:table/ml/rightsizing_features because no identity-based policy allows the glue:GetTable action
+[2026-10-03, 03:50:13 UTC] {taskinstance.py:2905} ERROR - Task failed with exception: EmrContainerOperator job run FAILED

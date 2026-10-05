@@ -1,0 +1,49 @@
+# Open Data Contract Standard (ODCS) v3.2. The producer (cloud-inventory) promises this shape to every consumer.
+apiVersion: v3.2.0
+kind: DataContract
+id: 7f1c2a54-2b1e-4f7e-9a51-ec2instancesraw
+name: ec2_instances_raw
+version: 2.3.0
+status: active
+domain: cloud-inventory
+team:
+  name: cloud-inventory
+  members:
+    - username: cloud-inventory-oncall@acme.example
+      role: owner
+schema:
+  - name: instances_raw
+    physicalName: glue.ec2.instances_raw
+    physicalType: table
+    description: One row per instance per 2-hourly DescribeInstances snapshot.
+    properties:
+      - name: instanceId
+        logicalType: string
+        required: true
+        primaryKey: true
+      - name: instanceType
+        logicalType: string
+        required: true
+      - name: state
+        logicalType: string
+        required: true
+        quality:
+          - metric: invalidValues
+            arguments:
+              validValues: [pending, running, stopping, stopped, shutting-down, terminated]
+            mustBeLessOrEqualTo: 0
+            severity: error
+      - name: accountId
+        logicalType: string
+        required: true
+      - name: region
+        logicalType: string
+        required: true
+      - name: snapshot_ts
+        logicalType: timestamp
+        required: true
+slaProperties:
+  - property: latency
+    value: 1
+    unit: h
+    element: snapshot_ts
