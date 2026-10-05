@@ -1,0 +1,22 @@
+[project]
+name = "fine-tune-distill"
+version = "0.1.0"
+description = "Lesson 9: distil a frontier model into a small one: dataset hygiene, a student baseline, confidence cascades, LoRA training and multi-LoRA serving"
+requires-python = ">=3.13,<3.14"
+dependencies = ["scikit-learn>=1.9", "numpy>=2"]
+
+[dependency-groups]
+dev = ["pytest>=9.1", "ruff>=0.14"]
+# GPU only (not installed by default): uv sync --group train
+train = ["torch>=2.14", "transformers>=5.18", "trl>=1.14", "peft>=0.21", "datasets>=5"]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

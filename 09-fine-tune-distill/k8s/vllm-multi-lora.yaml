@@ -1,0 +1,45 @@
+# One base model, many fine-tuned adapters: vLLM serves LoRA adapters side by side on the same GPU and
+# picks the adapter per request from the `model` field. Clients call model="triage-lora" for the student
+# and the base name for general use. Adapters are a few MB, so adding one is a config change, not a GPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-1-7b-lora
+  namespace: llm
+  labels: { app: qwen3-1-7b-lora }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: qwen3-1-7b-lora }
+  template:
+    metadata:
+      labels: { app: qwen3-1-7b-lora }
+    spec:
+      serviceAccountName: qwen3-1-7b-lora               # read access to the adapters bucket
+      nodeSelector: { karpenter.k8s.aws/instance-family: g6e }
+      tolerations: [{ key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }]
+      initContainers:
+        - name: fetch-adapters
+          image: docker.io/amazon/aws-cli:2.37.9
+          command: ["aws", "s3", "sync", "s3://acme-models/lora/triage-v1/", "/adapters/triage-v1/"]
+          volumeMounts: [{ name: adapters, mountPath: /adapters }]
+      containers:
+        - name: vllm
+          image: docker.io/vllm/vllm-openai:v0.30.0
+          args:
+            - --model=Qwen/Qwen3-1.7B
+            - --enable-lora
+            - --max-loras=4                             # adapters resident at once
+            - --max-lora-rank=16
+            - --lora-modules
+            - triage-lora=/adapters/triage-v1
+            - --max-model-len=4096
+          ports: [{ name: http, containerPort: 8000 }]
+          resources:
+            requests: { cpu: "4", memory: 24Gi, nvidia.com/gpu: "1" }
+            limits: { memory: 32Gi, nvidia.com/gpu: "1" }
+          readinessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 5 }
+          volumeMounts: [{ name: adapters, mountPath: /adapters }]
+      volumes:
+        - name: adapters
+          emptyDir: {}

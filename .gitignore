@@ -32,3 +32,6 @@ models/
 
 # lesson 5 local warehouse
 .lakehouse/
+
+# lesson 9 generated datasets
+.data/

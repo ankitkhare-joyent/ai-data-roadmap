@@ -40,7 +40,7 @@ Ray, Iceberg and Terraform skill it reuses). Higher fit means you get to expert 
 
 Lessons are pushed in order, so a link only works once its lesson exists.
 
-> **Status:** lessons 1 and 5 to 8 are fully tested (their optional real-Claude modes need your API key). Lessons 2 to 4 are written and their offline tests pass; their
+> **Status:** lessons 1 and 5 to 9 are fully tested (their optional real-Claude modes need your API key). Lessons 2 to 4 are written and their offline tests pass; their
 > Docker stacks have not had a full run yet (Docker went down mid-test) and will be verified next.
 
 Topics 1 to 3 make agents safe to run in production. Topics 4 and 5 are where your data

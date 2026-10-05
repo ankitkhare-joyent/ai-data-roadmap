@@ -1,0 +1,16 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+PYTHONPATH = "src"
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.distill]
+description = "Build the dataset, train the student, sweep the cascade threshold (offline, CPU, seconds)"
+run = "uv run python -m distill.run"
