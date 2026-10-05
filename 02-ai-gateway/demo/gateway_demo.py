@@ -59,14 +59,14 @@ try:
 except anthropic.APIStatusError as e:
     print(f"refused with HTTP {e.status_code}: {str(e.message)[:110]}")
 
-step("3. Fallback: 'smart' (Opus) is overloaded half the time; the gateway falls back to 'fast'")
+step("3. Retries and fallback: 'smart' (Opus) is overloaded most of the time; the gateway retries, then falls back")
 de_client = app_client(de_key)
 for i in range(6):
     raw = ask(de_client, "smart", f"Summarise yesterday's failed DAG runs, request {i} {run}",
               extra_body={"cache": {"no-cache": True}})
-    msg = raw.parse()
-    served = msg.content[0].text.split("]")[0].removeprefix("[served by ")
-    print(f"  request {i}: served by {served:<20} cost ${float(raw.headers.get('x-litellm-response-cost', 0)):.4f}")
+    h = raw.headers
+    print(f"  request {i}: served by {h.get('x-litellm-model-name', '?'):<28} retries {h.get('x-litellm-attempted-retries')}"
+          f"  fallbacks {h.get('x-litellm-attempted-fallbacks')}  cost ${float(h.get('x-litellm-response-cost', 0)):.4f}")
 if FAKE:
     print("  provider saw:", httpx.get(f"{FAKE}/stats").json())
 
@@ -92,13 +92,19 @@ for i in range(3):
 step("6. Cache: the same deterministic prompt twice")
 prompt = f"Classify this log line as INFO/WARN/ERROR: 'executor lost, retrying stage 3' ({run})"
 for label in ("first ", "second"):
-    t = time.perf_counter()
+    before = httpx.get(f"{FAKE}/stats").json().get("haiku_requests", 0) if FAKE else None
     raw = ask(de_client, "cheap", prompt)
-    print(f"  {label}: {1000 * (time.perf_counter() - t):6.0f} ms   cost ${float(raw.headers.get('x-litellm-response-cost', 0)):.5f}"
-          f"   cache hit: {raw.headers.get('x-litellm-cache-key') is not None}")
+    after = httpx.get(f"{FAKE}/stats").json().get("haiku_requests", 0) if FAKE else None
+    reached = "" if FAKE is None else f"   reached the provider: {'yes' if after > before else 'no (served from Redis)'}"
+    print(f"  {label}: gateway time {float(raw.headers['x-litellm-response-duration-ms']):6.1f} ms{reached}")
 
 step("7. Spend, per team and per key (what finance asks you for)")
-time.sleep(3)  # spend is written asynchronously in batches
+# Spend is accumulated in memory and flushed to Postgres in batches, so wait until every key's spend landed.
+for _ in range(45):
+    if all(admin.get("/key/info", params={"key": k}).json()["info"].get("spend", 0) > 0
+           for k in (de_key, an_key, tiny_key)):
+        break
+    time.sleep(2)
 for name, tid in (("data-eng", de), ("analytics", an)):
     info = admin.get("/team/info", params={"team_id": tid}).json()["team_info"]
     print(f"  {name:<10} spend ${info.get('spend', 0):.4f} of ${info.get('max_budget')}")

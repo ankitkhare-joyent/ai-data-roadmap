@@ -40,9 +40,8 @@ Ray, Iceberg and Terraform skill it reuses). Higher fit means you get to expert 
 
 Lessons are pushed in order, so a link only works once its lesson exists.
 
-> **Status:** lessons 1 and 5 to 9 are fully tested (their optional real-Claude modes need your API key).
-> Lessons 3 and 4 pass their offline tests. Lesson 2, and the Docker stacks of lessons 3 and 4, have not
-> had a full run yet because Docker went down mid-test; they will be verified next.
+> **Status:** every lesson has been run end to end: tests, offline demos and the Docker stacks of
+> lessons 1 to 4. The optional real-Claude modes need your API key.
 
 Topics 1 to 3 make agents safe to run in production. Topics 4 and 5 are where your data
 platform background gives you an unfair advantage. Topics 6 to 8 make agents smarter and

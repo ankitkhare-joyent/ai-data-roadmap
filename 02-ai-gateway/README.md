@@ -62,18 +62,45 @@ mise run down
 ```
 
 The demo (`demo/gateway_demo.py`) uses the normal Anthropic SDK pointed at the gateway. App code does not
-change at all, apart from `base_url`, the virtual key and the alias. It walks through:
+change at all, apart from `base_url`, the virtual key and the alias. From a real run:
 
-1. **Teams and keys.** `data-eng` ($5 a month: smart, fast, cheap) and `analytics` ($1 a month: fast,
-   cheap). Keys: `airflow-agent` at 60 rpm, `superset-bot` at 5 rpm, `intern` with a $0.004 budget.
-2. **Allow-list.** `superset-bot` asks for `smart` and is refused.
-3. **Fallback.** The fake provider returns `529 overloaded` for Opus half the time. Every request still
-   succeeds, and the text shows which model served it.
-4. **Rate limit.** Eight quick requests on a 5 rpm key: the last ones get `429`.
-5. **Budget.** The intern key's first answer goes through; once spend passes $0.004 the gateway refuses.
-6. **Cache.** The same classification prompt twice: the second is served from Redis in milliseconds at
-   zero cost.
-7. **Spend.** Per team and per key, the numbers finance actually asks for.
+```text
+== 2. Model allow-list: analytics asks for the expensive model
+refused with HTTP 403: The requested model 'smart' is not available for this API key ...
+
+== 3. Retries and fallback: 'smart' (Opus) is overloaded most of the time; the gateway retries, then falls back
+  request 0: served by anthropic/claude-opus-5-5    retries 0  fallbacks 0  cost $0.0089
+  request 1: served by anthropic/claude-sonnet-5-5  retries 0  fallbacks 1  cost $0.0000
+  request 3: served by anthropic/claude-opus-5-5    retries 1  fallbacks 0  cost $0.0089
+  provider saw: {'opus_requests': 20, 'opus_overloaded': 15, 'sonnet_requests': 8, 'haiku_requests': 6}
+
+== 4. Rate limit: superset-bot fires 8 requests at a 5 rpm key
+  status codes: [200, 200, 200, 200, 200, 429, 429, 429]
+
+== 5. Budget: the intern key has $0.004; one 'fast' answer costs about $0.0045
+  call 0: ok, cost $0.0044
+  call 1: HTTP 422: Budget has been exceeded! Key=intern-...
+
+== 6. Cache: the same deterministic prompt twice
+  first : gateway time  113.1 ms   reached the provider: yes
+  second: gateway time    6.4 ms   reached the provider: no (served from Redis)
+
+== 7. Spend, per team and per key (what finance asks you for)
+  data-eng   spend $0.0465 of $5.0
+  analytics  spend $0.0110 of $1.0
+```
+
+Every app request succeeded even though the fake provider returned `529 overloaded` for 15 of 20 Opus
+calls: some were saved by a retry, the rest fell back to Sonnet. Three things the run taught that the docs
+don't say loudly:
+
+- **The per-response cost header reads $0.0000 on fallback responses** in this LiteLLM version, while the
+  key and team spend in Postgres does include them. Reconcile budgets against the database (and the
+  provider invoice), not response headers.
+- **Spend is written to Postgres in batches.** Budgets are enforced from in-memory counters immediately,
+  but reports lag by a few seconds (`proxy_batch_write_at`).
+- **OpenBao must be *active*, not just unsealed,** before you configure it: right after unseal, raft is
+  still electing a leader and API calls return 500. The bootstrap waits for `sys/health` to return 200.
 
 To route to the real API, put `ANTHROPIC_API_KEY=...` and `ANTHROPIC_API_BASE=https://api.anthropic.com`
 in a git-ignored `.env`, re-run `docker compose run --rm bao-bootstrap`, then

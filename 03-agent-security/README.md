@@ -112,9 +112,24 @@ mise run demo            # triage, ops and "other-service" tokens against the se
 mise run down
 ```
 
-The demo prints a decoded token (`iss`, `aud`, `sub`, `scope`, `exp`), then shows the triage agent reading
-tickets (redacted and spotlighted) but being refused `stop_instance`, the ops agent stopping a dev box but
-refused on prod, and a token minted for another service rejected outright.
+From a real run of `mise run demo`:
+
+```text
+== what a token carries (triage-agent)
+{ "iss": "http://openbao:8200/v1/identity/oidc", "aud": "http://mcp:8300/mcp",
+  "sub": "60b2501b-...", "scope": "tickets:read ec2:read", "agent": "entity_2e1fd575.root", "exp": ... }
+
+== calls
+triage-agent   search_tickets   ok    <untrusted-f4ecd21c source="search_tickets"> [{"id": "OPS-4412", ...
+triage-agent   stop_instance    ERROR forbidden: stop_instance needs scope ec2:write
+ops-agent      stop_instance    ERROR refusing to stop a prod instance through an agent; use the change process
+ops-agent      stop_instance    ok    stopped i-0a1b2c3d4e5f60001
+other-service  search_tickets   REFUSED HTTP 401 Bearer error="invalid_token" ...
+no token       search_tickets   REFUSED HTTP 401 Bearer error="invalid_token" ...
+```
+
+The server's log shows why `other-service` was refused (`rejected token: Audience doesn't match`) and an
+audit line with the OpenBao entity id for every tool call that ran.
 
 ## Exercises
 

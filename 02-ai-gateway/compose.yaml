@@ -51,7 +51,7 @@ services:
 
   fake-llm:
     build: ./fake_llm
-    environment: { FAIL_RATE: "${FAKE_FAIL_RATE:-0.5}" }
+    environment: { FAIL_RATE: "${FAKE_FAIL_RATE:-0.8}" }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
       interval: 3s

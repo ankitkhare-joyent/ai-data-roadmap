@@ -64,6 +64,15 @@ if not health.get("initialized"):
     print("initialised OpenBao")
 while call("GET", "sys/seal-status")["sealed"]:
     time.sleep(1)
+# Unsealed is not ready: raft still has to elect this node leader. Wait for "active" (HTTP 200).
+for _ in range(60):
+    try:
+        with urllib.request.urlopen(f"{ADDR}/v1/sys/health", timeout=5) as r:
+            if r.status == 200:
+                break
+    except urllib.error.URLError:
+        pass
+    time.sleep(1)
 TOKEN = json.loads(INIT.read_text())["root_token"]
 
 mounts = call("GET", "sys/mounts")["data"]
@@ -109,6 +118,8 @@ for name, value in (("role_id", role_id), ("secret_id", secret_id)):
     p.chmod(0o444)
 admin = Path("/bootstrap/admin/master_key")
 admin.parent.mkdir(parents=True, exist_ok=True)
+admin.unlink(missing_ok=True)
 admin.write_text(kv("gateway/runtime")["data"]["master_key"])
+os.chown(admin, 10001, 10001)        # the demo container's non-root user, and nobody else
 admin.chmod(0o400)
 print("OpenBao configured for the gateway")

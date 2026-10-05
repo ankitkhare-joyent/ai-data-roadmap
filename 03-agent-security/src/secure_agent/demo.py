@@ -27,14 +27,26 @@ def creds(role: str) -> tuple[str, str]:
 
 async def call(bearer: str, tool: str, args: dict) -> str:
     try:
-        async with httpx2.AsyncClient(headers={"Authorization": f"Bearer {bearer}"}, timeout=15) as http, \
+        headers = {"Authorization": f"Bearer {bearer}"} if bearer else {}
+        async with httpx2.AsyncClient(headers=headers, timeout=15) as http, \
                 streamable_http_client(MCP, http_client=http) as (r, w, *_), ClientSession(r, w) as s:
             await s.initialize()
             res = await s.call_tool(tool, args)
             text = res.content[0].text.replace("\n", " ")
             return ("ERROR " if res.is_error else "ok    ") + text[:110]
-    except Exception as e:  # noqa: BLE001  (a 401 surfaces as some transport error in the client)
-        return f"REFUSED {type(e).__name__}: {str(e)[:90]}"
+    except Exception as e:  # noqa: BLE001  (a 401 surfaces as a transport error inside a task group)
+        # The MCP client reports a refused connection generically; ask the server directly what it said.
+        headers = {"Authorization": f"Bearer {bearer}"} if bearer else {}
+        r = httpx2.post(MCP, headers={**headers, "accept": "application/json, text/event-stream"},
+                        json={"jsonrpc": "2.0", "id": 1, "method": "ping"})
+        return f"REFUSED HTTP {r.status_code} {r.headers.get('www-authenticate', '')[:70]} ({_root_cause(e)})"
+
+
+def _root_cause(e: BaseException) -> str:
+    while isinstance(e, BaseExceptionGroup) and e.exceptions:
+        e = e.exceptions[0]
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    return f"HTTP {status}" if status else f"{type(e).__name__}: {str(e)[:80]}"
 
 
 async def main() -> None:

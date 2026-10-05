@@ -63,7 +63,7 @@ client ──> Gateway (Gateway API) ──> endpoint picker ──> vLLM pods (
     sizing.py     memory, KV cache, concurrency, decode speed and $/M tokens for common models and GPUs
     bench.py      async load generator: agentic workload, streaming, TTFT / ITL / tok/s at each concurrency
     router.py     a small inference-aware router: round_robin vs least_loaded vs prefix_aware
-    compare.py    runs the same workload through each strategy
+    compare.py    runs the same shape of workload through each strategy, cold cache each time
   compose.yaml    three GPU-free vLLM simulators (llm-d-inference-sim) behind the router
   k8s/production/ EKS manifests: vLLM Deployment (S3 streaming, FP8, probes, PDB), InferencePool +
                   HTTPRoute, KEDA on queue depth, the same model as a KServe LLMInferenceService
@@ -97,15 +97,33 @@ The routing experiment needs Docker (three ~30 MB simulator containers and the r
 ```bash
 docker ps              # Docker is shared: start only when the other lab stacks are down
 mise run up
-mise run bench         # 36 sessions x 4 turns, 6 tenants with 1.5k-token system prompts, per strategy
+mise run bench         # 48 sessions x 6 turns, 12 tenants with 1.5k-token system prompts, per strategy
 mise run down
 ```
 
-What to look for: `prefix_aware` keeps each tenant on the replica that already holds its system prompt
-in the simulated KV cache, so most turns skip the prefill and TTFT p50 drops well below round-robin.
-`least_loaded` evens out queues and helps p95, but scatters tenants. The `picks per backend` line shows
-how each strategy spread the load. If one replica gets too hot, `prefix_aware` spills over, which is the
-trade-off llm-d's scorer weights tune.
+From a real run (each strategy gets fresh prompts, so none starts with a warm cache):
+
+```text
+48 sessions x 6 turns, 12 in flight, 12 tenants with 1500-token system prompts
+
+round_robin                  n= 288 err=  0 | TTFT p50     497 p95    1375 ms | ITL p50  21.5 ms |     254 out tok/s
+least_loaded                 n= 288 err=  0 | TTFT p50     391 p95    1224 ms | ITL p50  21.8 ms |     295 out tok/s
+prefix_aware                 n= 288 err=  0 | TTFT p50     311 p95    1198 ms | ITL p50  20.9 ms |     302 out tok/s
+```
+
+Prefix-aware routing cut median TTFT by 37% against round-robin and raised throughput by 19%, on the same
+three replicas. It works because each agent session keeps landing on the replica that already holds its
+tenant's system prompt *and* its growing history in the KV cache: a cold 1.5k-token prefill takes about
+400 ms on these simulators, a cached one about 30 ms. Its p95 is no better, because hashing 12 tenants onto
+3 replicas put more load on one of them (see `picks per backend`). That's the trade-off llm-d's endpoint
+picker manages with weighted prefix, queue and KV-cache scorers instead of one spill-over rule.
+
+Two lessons from getting this to run:
+
+- **Fair benchmarks need cold starts.** The first version reused the same prompts for every strategy, so
+  whichever ran last inherited a warm cache and looked best. Each strategy now gets new prompts.
+- **The simulator rejects work its KV cache can't hold** (HTTP 500) where vLLM would queue or preempt.
+  The cache is sized (2048 blocks) and batch slots capped (4) so that every run completes with zero errors.
 
 ## Exercises
 

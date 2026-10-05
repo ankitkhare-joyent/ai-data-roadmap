@@ -38,8 +38,8 @@ class Result:
 class Workload:
     tenants: int = 6
     system_tokens: int = 1500      # tools + instructions: identical for every turn of a tenant
-    turns: int = 4                 # each turn appends to the session history
-    user_tokens: int = 120
+    turns: int = 6                 # each turn appends to the session history
+    user_tokens: int = 400         # user text plus tool output each turn: sessions grow fast, like agents
     max_tokens: int = 64
     seed: int = 7
     _rng: random.Random = field(init=False, repr=False)
@@ -135,7 +135,7 @@ def summarise(label: str, results: list[Result], wall: float) -> str:
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://localhost:49480")
-    ap.add_argument("--model", default="acme/fleet-8b")
+    ap.add_argument("--model", default="fleet-8b")
     ap.add_argument("--concurrency", type=int, nargs="+", default=[1, 8, 24])
     ap.add_argument("--sessions", type=int, default=24)
     a = ap.parse_args()

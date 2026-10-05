@@ -62,3 +62,4 @@ general_settings:
   # path is the entrypoint below rendering secrets from OpenBao into the process env at boot.
   disable_spend_logs: false
   store_prompts_in_spend_logs: false             # spend and metadata yes, prompt text no
+  proxy_batch_write_at: 5                        # flush spend to Postgres every 5 s (default is slower)

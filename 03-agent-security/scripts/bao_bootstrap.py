@@ -54,6 +54,15 @@ if not health.get("initialized"):
     INIT.chmod(0o600)
 while call("GET", "sys/seal-status")["sealed"]:
     time.sleep(1)
+# Unsealed is not ready: raft still has to elect this node leader. Wait for "active" (HTTP 200).
+for _ in range(60):
+    try:
+        with urllib.request.urlopen(f"{ADDR}/v1/sys/health", timeout=5) as r:
+            if r.status == 200:
+                break
+    except urllib.error.URLError:
+        pass
+    time.sleep(1)
 TOKEN = json.loads(INIT.read_text())["root_token"]
 
 if "approle/" not in call("GET", "sys/auth")["data"]:

@@ -3,7 +3,7 @@
 It speaks just enough of POST /v1/messages for LiteLLM: text responses with realistic usage numbers.
 Behaviour is driven by the model name, so the gateway config can model a flaky primary and a healthy
 fallback:
-    *opus*    fails with 529 overloaded on FAIL_RATE of requests (default 0.5), else answers slowly
+    *opus*    fails with 529 overloaded on FAIL_RATE of requests (compose sets 0.8), else answers slowly
     *sonnet*  answers
     *haiku*   answers fast
 Every response says which model served it, so you can see routing and fallbacks from the client.
