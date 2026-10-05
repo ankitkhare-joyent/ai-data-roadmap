@@ -1,0 +1,25 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+_.file = ".env"            # optional ANTHROPIC_API_KEY for `mise run claude`
+PYTHONPATH = "src"
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.context]
+description = "40-turn agent session under four context strategies: peak context, tokens billed, cache effects"
+run = "uv run python -m agent_memory.context"
+
+[tasks.evals]
+description = "Multi-session memory evals: recall, updates, isolation, poisoning (offline, scripted agent)"
+run = "uv run python -m agent_memory.evals"
+
+[tasks.claude]
+description = "Two sessions with real Claude, the memory tool and this lesson's backend"
+run = "uv run python -m agent_memory.claude_demo"
