@@ -1,0 +1,21 @@
+[tools]
+python = "3.13"
+uv = "0.12.22"
+
+[env]
+_.file = ".env"            # optional ANTHROPIC_API_KEY for `mise run demo-claude`
+PYTHONPATH = "src"
+
+[tasks.sync]
+run = "uv sync"
+
+[tasks.test]
+run = "uv run pytest -q"
+
+[tasks.demo]
+description = "Two A2A specialist agents + an orchestrator, all local (no Docker, no API key)"
+run = "uv run python -m multi_agent.demo"
+
+[tasks.demo-claude]
+description = "Same, with Claude choosing which agents to call from their Agent Cards"
+run = "uv run python -m multi_agent.demo --claude"

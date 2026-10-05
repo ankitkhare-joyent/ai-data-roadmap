@@ -1,0 +1,26 @@
+[project]
+name = "multi-agent-a2a"
+version = "0.1.0"
+description = "Lesson 7: multi-agent systems: orchestrator-workers over the A2A protocol, with budgets, auth and tracing"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "a2a-sdk[http-server]>=1.2,<2",
+    "anthropic>=1.11,<2",
+    "httpx>=0.28",
+    "fastapi>=0.142",
+    "uvicorn>=0.54",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.1", "pytest-asyncio>=1.4", "ruff>=0.14"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
