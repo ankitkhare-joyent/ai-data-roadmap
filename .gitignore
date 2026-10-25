@@ -35,3 +35,6 @@ models/
 
 # lesson 9 generated datasets
 .data/
+
+# lesson 6 lab memory store
+.labmem/

@@ -23,3 +23,7 @@ run = "uv run python -m agent_memory.evals"
 [tasks.claude]
 description = "Two sessions with real Claude, the memory tool and this lesson's backend"
 run = "uv run python -m agent_memory.claude_demo"
+
+[tasks.reset]
+description = "Delete the lab's memory store (.labmem/): the lab's starting point"
+run = "rm -rf .labmem && uv sync -q"
