@@ -19,3 +19,7 @@ run = "uv run python -m data_agent.triage"
 [tasks.triage-claude]
 description = "Same, with Claude driving the investigation through the tools"
 run = "uv run python -m data_agent.triage --claude"
+
+[tasks.reset]
+description = "Nothing persists between runs (patches happen in throwaway clones); reinstall deps and check the fixtures"
+run = "uv sync -q && git diff --exit-code -- data repo && echo 'fixtures clean'"
