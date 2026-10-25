@@ -30,3 +30,7 @@ run = "docker compose run --rm demo"
 
 [tasks.down]
 run = "docker compose down"
+
+[tasks.reset]
+description = "Wipe OpenBao and start fresh (OpenBao identity tokens + the MCP server): the lab's starting point"
+run = "docker compose down -v && docker compose build -q && mise run up"
