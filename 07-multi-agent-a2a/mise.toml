@@ -19,3 +19,11 @@ run = "uv run python -m multi_agent.demo"
 [tasks.demo-claude]
 description = "Same, with Claude choosing which agents to call from their Agent Cards"
 run = "uv run python -m multi_agent.demo --claude"
+
+[tasks.serve]
+description = "Run both specialist agents on :49701 and :49702 for the lab (tokens in .lab-tokens)"
+run = "uv run python -m multi_agent.serve"
+
+[tasks.reset]
+description = "Forget old lab tokens: the lab's starting point (the agents keep no state between runs)"
+run = "rm -f .lab-tokens && uv sync -q"

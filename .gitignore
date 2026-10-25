@@ -38,3 +38,6 @@ models/
 
 # lesson 6 lab memory store
 .labmem/
+
+# lesson 7 lab tokens
+.lab-tokens

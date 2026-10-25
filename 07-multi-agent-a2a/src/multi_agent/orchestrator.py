@@ -92,14 +92,16 @@ class Orchestrator:
 
             # Resolve follow-up questions from what the other agents found, before bothering the user.
             for i, rep in enumerate(replies):
-                if rep.state == "TASK_STATE_INPUT_REQUIRED" and budget.take():
-                    known = IID.findall(question) or [x for o in replies if o is not rep for x in IID.findall(o.text)]
-                    if known:
-                        hot = _hot_instance(replies) or known[0]
-                        follow = await by_name[rep.agent].ask(f"{question} (instance {hot})",
-                                                              task_id=rep.task_id, context_id=rep.context_id)
-                        spans.append(follow)
-                        replies[i] = follow
+                if rep.state != "TASK_STATE_INPUT_REQUIRED":
+                    continue
+                known = IID.findall(question) or [x for o in replies if o is not rep for x in IID.findall(o.text)]
+                # Only spend budget on a follow-up we can actually answer.
+                if known and budget.take():
+                    hot = _hot_instance(replies) or known[0]
+                    follow = await by_name[rep.agent].ask(f"{question} (instance {hot})",
+                                                          task_id=rep.task_id, context_id=rep.context_id)
+                    spans.append(follow)
+                    replies[i] = follow
             answer = _synthesise(question, replies)
             return Result(answer, spans, time.perf_counter() - t0, trace, budget.used)
         finally:
