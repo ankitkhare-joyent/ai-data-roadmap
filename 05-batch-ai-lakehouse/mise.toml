@@ -19,3 +19,7 @@ run = "uv run python -m lakehouse_ai.demo"
 
 [tasks.clean]
 run = "rm -rf .lakehouse"
+
+[tasks.reset]
+description = "Delete the local warehouse (Iceberg catalog, tables, Lance vectors): the lab's starting point"
+run = "rm -rf .lakehouse && uv sync -q"
