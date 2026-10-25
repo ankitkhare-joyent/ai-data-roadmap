@@ -88,8 +88,14 @@ async def chat(request: Request):
     backend = pool.pick(strategy, prompt_prefix(body))
     pool.picks[(strategy, backend)] += 1
     pool.inflight[backend] += 1
-    upstream = await client.send(client.build_request("POST", f"{backend}/v1/chat/completions", json=body),
-                                 stream=True)
+    try:
+        upstream = await client.send(client.build_request("POST", f"{backend}/v1/chat/completions", json=body),
+                                     stream=True)
+    except httpx.HTTPError as e:
+        # No health checks here (an EPP has them): a dead replica is only noticed when a request fails.
+        pool.inflight[backend] -= 1
+        return JSONResponse({"error": f"backend {backend} unavailable: {type(e).__name__}"}, status_code=502,
+                            headers={"x-backend": backend})
 
     async def relay():
         try:

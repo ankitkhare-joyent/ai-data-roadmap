@@ -25,3 +25,7 @@ run = "docker compose run --rm bench"
 
 [tasks.down]
 run = "docker compose down"
+
+[tasks.reset]
+description = "Restart the simulators and router from scratch (empty KV caches, zeroed counters)"
+run = "docker compose down -v && mise run up"

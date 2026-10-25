@@ -9,7 +9,7 @@ case "$(basename "$PWD")" in
   01-durable-agents) export BAO_ADDR=http://localhost:49200 TEMPORAL_UI=http://localhost:49234 ;;
   02-ai-gateway)     export BAO_ADDR=http://localhost:49401 GW=http://localhost:49400 ;;
   03-agent-security) export BAO_ADDR=http://localhost:49300 MCP=http://localhost:49301/mcp PYTHONPATH=src:. ;;
-  04-llm-serving-k8s) export ROUTER=http://localhost:49480 ;;
+  04-llm-serving-k8s) export ROUTER=http://localhost:49480 PYTHONPATH=src ;;
   0[5-9]-*)          export PYTHONPATH=src ;;
   *) echo "lab/env.sh: cd into a lesson folder first (01-durable-agents, 02-ai-gateway, ...)" >&2 ;;
 esac
@@ -63,3 +63,8 @@ mcp_rpc() {
   curl -s "${h[@]}" -H "mcp-session-id: $sid" "$MCP" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$2\",\"params\":$params}" \
     | sed -n 's/^data: //p' | head -1
 }
+
+# sim N PATH [curl-ish python]      -> lesson 4: GET a path on simulator N (they're internal; we go through the router container)
+sim() { docker compose exec -T router python -c "import urllib.request,sys;print(urllib.request.urlopen('http://sim-$1:8000$2').read().decode())"; }
+# chat TENANT [ROUTE] [URL]         -> lesson 4: one streamed request with a 1.5k-word tenant prompt; prints backend, TTFT, cached tokens
+chat() { python3 "$(git rev-parse --show-toplevel)/lab/chat.py" "$@"; }
