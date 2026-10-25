@@ -47,6 +47,12 @@ Topics 1 to 3 make agents safe to run in production. Topics 4 and 5 are where yo
 platform background gives you an unfair advantage. Topics 6 to 8 make agents smarter and
 put them to work on your own platform. Topic 9 is an optimisation.
 
+## Hands-on lab
+
+After (or alongside) each lesson, work through its drill in [lab/](lab/README.md): predict, run, check, then
+break it and fix it. Start every sitting with the fresh-start sequence at the top of
+[lab/README.md](lab/README.md).
+
 ## How each lesson is laid out
 
 ```text

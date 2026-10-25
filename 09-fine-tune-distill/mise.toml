@@ -14,3 +14,7 @@ run = "uv run pytest -q"
 [tasks.distill]
 description = "Build the dataset, train the student, sweep the cascade threshold (offline, CPU, seconds)"
 run = "uv run python -m distill.run"
+
+[tasks.reset]
+description = "Delete generated datasets (.data/): the lab's starting point"
+run = "rm -rf .data && uv sync -q"
