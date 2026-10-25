@@ -37,3 +37,8 @@ events() {
   docker compose exec -T temporal temporal workflow show -w "$1" --output json \
     | jq -r '.events[].eventType' | sed 's/EVENT_TYPE_//' | sort | uniq -c | sort -rn
 }
+
+# gw_master                        -> lesson 2: the LiteLLM master key, for use inside $( ... ) only
+gw_master() {
+  docker compose run --rm -T --no-deps --entrypoint cat bao-bootstrap /bootstrap/admin/master_key 2>/dev/null
+}

@@ -18,3 +18,7 @@ run = "docker compose down"
 
 [tasks.nuke]
 run = "docker compose down -v"
+
+[tasks.reset]
+description = "Wipe everything (OpenBao, Postgres spend, Redis) and start fresh: the lab's starting point"
+run = "docker compose down -v && mise run up"
