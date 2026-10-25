@@ -26,3 +26,7 @@ run = "docker compose down"
 [tasks.nuke]
 description = "Stop and delete all data, including OpenBao and Temporal history"
 run = "docker compose down -v"
+
+[tasks.reset]
+description = "Wipe everything (OpenBao, Temporal history, fleet state) and start fresh: the lab's starting point"
+run = "docker compose down -v && mise run up"

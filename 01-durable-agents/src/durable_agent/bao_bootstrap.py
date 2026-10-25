@@ -65,6 +65,11 @@ def initialise(bao: Bao) -> None:
         time.sleep(1)
     else:
         sys.exit("OpenBao is still sealed")
+    # Unsealed is not ready: raft still has to elect this node leader. Wait for "active" (HTTP 200).
+    for _ in range(60):
+        if bao.http.get("/v1/sys/health").status_code == 200:
+            break
+        time.sleep(1)
     bao.token = json.loads(INIT_FILE.read_text())["root_token"]
 
 
